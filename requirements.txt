@@ -1,5 +1,3 @@
-torch==2.12.1
-
 transformers==4.41.2
 datasets==2.20.0
 seqeval==1.2.2
@@ -8,7 +6,7 @@ accelerate==0.32.1
 
 optimum[onnxruntime]==1.27.0
 onnx==1.16.1
-onnxruntime==1.18.1
+onnxruntime==1.27.0
 
 streamlit==1.37.1
 

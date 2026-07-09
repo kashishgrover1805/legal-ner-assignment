@@ -1,5 +1,5 @@
 import streamlit as st
-import torch
+import numpy as np
 from transformers import AutoTokenizer
 from optimum.onnxruntime import ORTModelForTokenClassification
 
@@ -60,7 +60,7 @@ if st.button("Predict Entities"):
 
         encoding = tokenizer(
             text,
-            return_tensors="pt",
+            return_tensors="np",
             truncation=True,
             max_length=256,
             return_offsets_mapping=True
@@ -68,10 +68,9 @@ if st.button("Predict Entities"):
 
         offsets = encoding.pop("offset_mapping")[0].tolist()
 
-        with torch.no_grad():
-            outputs = model(**encoding)
+        outputs = model(**encoding)
 
-        predictions = torch.argmax(outputs.logits, dim=-1)[0].tolist()
+        predictions = np.argmax(outputs.logits, axis=-1)[0].tolist()
 
         labels = [
             model.config.id2label[idx]
@@ -80,11 +79,11 @@ if st.button("Predict Entities"):
 
         entities = merge_bio_spans(offsets, labels)
 
-        # Add entity text
         for entity in entities:
             entity["text"] = text[entity["start"]:entity["end"]]
 
     if not entities:
+
         st.warning("No entities detected.")
 
     else:
