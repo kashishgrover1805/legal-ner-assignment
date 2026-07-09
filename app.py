@@ -16,9 +16,9 @@ from optimum.onnxruntime import ORTModelForTokenClassification
 
 from eval import merge_bio_spans
 
-# -------------------- Model Path --------------------
+# -------------------- Hugging Face Model --------------------
 
-MODEL_DIR = "./outputs/onnx"
+MODEL_ID = "kashishgroverrr/legal-ner-onnx"
 
 # -------------------- Load Model --------------------
 
@@ -26,13 +26,11 @@ MODEL_DIR = "./outputs/onnx"
 def load_model():
 
     tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_DIR,
-        local_files_only=True
+        MODEL_ID
     )
 
     model = ORTModelForTokenClassification.from_pretrained(
-        MODEL_DIR,
-        local_files_only=True
+        MODEL_ID
     )
 
     return tokenizer, model
@@ -93,11 +91,9 @@ if st.button("Predict Entities"):
             labels
         )
 
-        # -------- FIX --------
-        # Add detected text for every entity
+        # Add entity text
         for entity in entities:
             entity["text"] = text[entity["start"]:entity["end"]]
-        # ---------------------
 
     if len(entities) == 0:
 

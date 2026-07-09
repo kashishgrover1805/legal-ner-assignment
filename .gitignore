@@ -1,11 +1,55 @@
 data/
-outputs/model/*/checkpoint-*/
+# Dataset
+
+data/
+
+
+
+# ONNX models 
+
 outputs/onnx/
+
 outputs/onnx_quantized/
+
+
+
+# Training checkpoints
+
+outputs/model/checkpoint-*/
+
+
+
+# Large training files
+
+outputs/model/**/optimizer.pt
+
+outputs/model/**/scheduler.pt
+outputs/model/best/
+outputs/model/**/rng_state.pth
+
+outputs/model/**/trainer_state.json
+
+outputs/model/**/training_args.bin
+
+
+
+# Python
+
 __pycache__/
+
 *.pyc
+
 .ipynb_checkpoints/
+
+
+
+# Environment
+
 .env
-outputs/model/
-outputs/onnx/
-outputs/onnx_quantized/
+.venv/
+venv/
+
+# OS
+
+.DS_Store
+Thumbs.db
