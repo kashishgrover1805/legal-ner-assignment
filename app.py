@@ -1,4 +1,9 @@
 import streamlit as st
+import torch
+from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForTokenClassification
+
+from eval import merge_bio_spans
 
 # -------------------- Page Configuration --------------------
 
@@ -7,14 +12,6 @@ st.set_page_config(
     page_icon="⚖️",
     layout="wide"
 )
-
-# -------------------- Imports --------------------
-
-import torch
-from transformers import AutoTokenizer
-from optimum.onnxruntime import ORTModelForTokenClassification
-
-from eval import merge_bio_spans
 
 # -------------------- Hugging Face Model --------------------
 
@@ -25,13 +22,9 @@ MODEL_ID = "kashishgroverrr/legal-ner-onnx"
 @st.cache_resource
 def load_model():
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_ID
-    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
 
-    model = ORTModelForTokenClassification.from_pretrained(
-        MODEL_ID
-    )
+    model = ORTModelForTokenClassification.from_pretrained(MODEL_ID)
 
     return tokenizer, model
 
@@ -44,12 +37,14 @@ st.title("⚖️ Legal Named Entity Recognition")
 
 st.write(
     """
-Detect legal entities from Indian court judgments using a fine-tuned
-LegalBERT ONNX model.
+Detect legal entities from Indian court judgments using a fine-tuned LegalBERT ONNX model.
 """
 )
 
-default_text = """The petitioner Ramesh Kumar filed a case before the Delhi High Court under Section 302 IPC on 12 March 2019."""
+default_text = (
+    "The petitioner Ramesh Kumar filed a case before the Delhi High Court "
+    "under Section 302 IPC on 12 March 2019."
+)
 
 text = st.text_area(
     "Enter Legal Text",
@@ -76,27 +71,20 @@ if st.button("Predict Entities"):
         with torch.no_grad():
             outputs = model(**encoding)
 
-        predictions = torch.argmax(
-            outputs.logits,
-            dim=-1
-        )[0].tolist()
+        predictions = torch.argmax(outputs.logits, dim=-1)[0].tolist()
 
         labels = [
             model.config.id2label[idx]
             for idx in predictions
         ]
 
-        entities = merge_bio_spans(
-            offsets,
-            labels
-        )
+        entities = merge_bio_spans(offsets, labels)
 
         # Add entity text
         for entity in entities:
             entity["text"] = text[entity["start"]:entity["end"]]
 
-    if len(entities) == 0:
-
+    if not entities:
         st.warning("No entities detected.")
 
     else:
