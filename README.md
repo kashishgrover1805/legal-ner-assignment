@@ -192,22 +192,40 @@ you retrain --- numbers are hardware-dependent.
 
 ## 7. Deployment
 
-The Space (`app.py`, Streamlit SDK, CPU basic tier) loads the **FP32
-ONNX** model from `./model` --- not the INT8-quantized one. Testing
-(Section 10) showed quantization badly damaged accuracy on short
-sentences even though the latency/size win was modest in this run, so
-FP32 ONNX is the deployed choice. Before pushing to the Space:
+The application is deployed using **Streamlit Community Cloud** on a CPU instance.
 
-``` bash
-mkdir -p space/model
-cp -r outputs/onnx/* space/model/
-cp app.py eval.py requirements.txt space/
-cp -r src space/
+Instead of storing the trained model inside the GitHub repository, the application downloads the **FP32 ONNX** model directly from the Hugging Face Model Hub during startup.
+
+**Model Repository**
+
+https://huggingface.co/kashishgroverrr/legal-ner-onnx
+
+This keeps the GitHub repository lightweight while avoiding GitHub's file size limitations.
+
+### Deployment Steps
+
+1. Push the project code to GitHub.
+
+2. Upload the exported ONNX model files (`model.onnx`, `config.json`, `tokenizer.json`, `tokenizer_config.json`, `special_tokens_map.json`, `vocab.txt`) to the Hugging Face model repository.
+
+3. Configure `app.py` to load the model directly from Hugging Face:
+
+```python
+MODEL_ID = "kashishgroverrr/legal-ner-onnx"
+
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+model = ORTModelForTokenClassification.from_pretrained(MODEL_ID)
 ```
 
-Then create a new Space on huggingface.co (SDK: Streamlit, hardware: CPU
-basic), and push the `space/` folder to it (`git push` to the Space's
-git remote, or upload via the web UI / `huggingface_hub`).
+4. Deploy the GitHub repository on **Streamlit Community Cloud** by selecting:
+
+- Repository: `kashishgrover1805/legal-ner-assignment`
+- Branch: `main`
+- Main file: `app.py`
+
+Once deployed, Streamlit automatically installs the dependencies, downloads the ONNX model from Hugging Face, and serves the application on a CPU instance.
+
+This deployment strategy avoids committing large model files to GitHub while ensuring reproducible inference and easy public access.
 
 ## 8. Repository structure
 
@@ -224,6 +242,8 @@ git remote, or upload via the web UI / `huggingface_hub`).
     │   └── benchmark.py        # latency / size / RAM benchmarking
     └── outputs/                # metrics, model checkpoints, onnx artifacts (gitignored bulk)
 
+Hugging Face Model Repository:
+https://huggingface.co/kashishgroverrr/legal-ner-onnx
 ## 9. Exact commands, in order
 
 ``` bash
