@@ -1,83 +1,127 @@
-"""
-Hugging Face Spaces entrypoint (Gradio SDK, CPU basic hardware).
+import streamlit as st
 
-Loads the FP32 ONNX model (see src/export_onnx.py) rather than the
-INT8-quantized one. Testing showed INT8 quantization badly hurt accuracy on
-short sentences (see README Section 10) even though it was smaller/faster,
-so FP32 ONNX is the deployed choice -- 416MB comfortably fits a CPU basic
-Space's 16GB RAM, and FP32 ONNX (~160ms) is already fast enough without
-quantization's accuracy cost. Expects the model files to be present in
-./model (copy outputs/onnx/* here before pushing the Space).
-"""
+# -------------------- Page Configuration --------------------
 
-import os
-import gradio as gr
+st.set_page_config(
+    page_title="Legal NER",
+    page_icon="⚖️",
+    layout="wide"
+)
+
+# -------------------- Imports --------------------
+
 import torch
-from optimum.onnxruntime import ORTModelForTokenClassification
 from transformers import AutoTokenizer
+from optimum.onnxruntime import ORTModelForTokenClassification
 
 from eval import merge_bio_spans
 
-MODEL_DIR = os.environ.get("MODEL_DIR", "./model")
+# -------------------- Model Path --------------------
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-model = ORTModelForTokenClassification.from_pretrained(MODEL_DIR)
+MODEL_DIR = "./outputs/onnx"
 
-LABEL_COLORS = {
-    "NAME": "#f9c74f",
-    "ORGANIZATION": "#90be6d",
-    "LOCATION": "#43aa8b",
-    "STATUTE": "#577590",
-    "CASE_REFERENCE": "#f3722c",
-    "DATE": "#f94144",
-}
+# -------------------- Load Model --------------------
 
-EXAMPLE = (
-    "The petitioner, Ramesh Kumar, filed a writ petition before the Delhi "
-    "High Court under Article 226 of the Constitution of India, challenging "
-    "the order dated 12th March 2019 passed in Suo Moto Writ Petition No. 45 "
-    "of 2018, relying on the precedent in State of Punjab v. Ajaib Singh."
-)
+@st.cache_resource
+def load_model():
 
-
-def predict(text):
-    enc = tokenizer(
-        text, return_tensors="pt", truncation=True, max_length=256, return_offsets_mapping=True
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_DIR,
+        local_files_only=True
     )
-    offsets = enc.pop("offset_mapping")[0].tolist()
-    with torch.no_grad():
-        logits = model(**enc).logits
-    pred_ids = torch.argmax(logits, dim=-1)[0].tolist()
-    id2label = model.config.id2label
-    labels = [id2label[i] for i in pred_ids]
 
-    spans = merge_bio_spans(offsets, labels)
+    model = ORTModelForTokenClassification.from_pretrained(
+        MODEL_DIR,
+        local_files_only=True
+    )
 
-    highlighted = []
-    cursor = 0
-    for s in sorted(spans, key=lambda x: x["start"]):
-        if s["start"] > cursor:
-            highlighted.append((text[cursor:s["start"]], None))
-        highlighted.append((text[s["start"]:s["end"]], s["type"]))
-        cursor = s["end"]
-    if cursor < len(text):
-        highlighted.append((text[cursor:], None))
-
-    return highlighted
+    return tokenizer, model
 
 
-demo = gr.Interface(
-    fn=predict,
-    inputs=gr.Textbox(lines=6, label="Legal text", value=EXAMPLE),
-    outputs=gr.HighlightedText(label="Detected entities", color_map=LABEL_COLORS),
-    title="Legal NER — Indian Court Judgments",
-    description=(
-        "Extracts NAME, ORGANIZATION, LOCATION, STATUTE, CASE_REFERENCE and "
-        "DATE entities from Indian court judgment text. Runs on CPU with an "
-        "INT8-quantized ONNX model for fast inference."
-    ),
-    examples=[[EXAMPLE]],
+tokenizer, model = load_model()
+
+# -------------------- UI --------------------
+
+st.title("⚖️ Legal Named Entity Recognition")
+
+st.write(
+    """
+Detect legal entities from Indian court judgments using a fine-tuned
+LegalBERT ONNX model.
+"""
 )
 
-if __name__ == "__main__":
-    demo.launch()
+default_text = """The petitioner Ramesh Kumar filed a case before the Delhi High Court under Section 302 IPC on 12 March 2019."""
+
+text = st.text_area(
+    "Enter Legal Text",
+    value=default_text,
+    height=200
+)
+
+# -------------------- Prediction --------------------
+
+if st.button("Predict Entities"):
+
+    with st.spinner("Running inference..."):
+
+        encoding = tokenizer(
+            text,
+            return_tensors="pt",
+            truncation=True,
+            max_length=256,
+            return_offsets_mapping=True
+        )
+
+        offsets = encoding.pop("offset_mapping")[0].tolist()
+
+        with torch.no_grad():
+            outputs = model(**encoding)
+
+        predictions = torch.argmax(
+            outputs.logits,
+            dim=-1
+        )[0].tolist()
+
+        labels = [
+            model.config.id2label[idx]
+            for idx in predictions
+        ]
+
+        entities = merge_bio_spans(
+            offsets,
+            labels
+        )
+
+        # -------- FIX --------
+        # Add detected text for every entity
+        for entity in entities:
+            entity["text"] = text[entity["start"]:entity["end"]]
+        # ---------------------
+
+    if len(entities) == 0:
+
+        st.warning("No entities detected.")
+
+    else:
+
+        st.success(f"Detected {len(entities)} entities")
+
+        results = []
+
+        for entity in entities:
+
+            results.append(
+                {
+                    "Entity Type": entity["type"],
+                    "Text": entity["text"],
+                    "Start": entity["start"],
+                    "End": entity["end"]
+                }
+            )
+
+        st.dataframe(
+            results,
+            use_container_width=True,
+            hide_index=True
+        )
