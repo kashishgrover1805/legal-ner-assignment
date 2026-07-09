@@ -1,0 +1,11 @@
+data/
+outputs/model/*/checkpoint-*/
+outputs/onnx/
+outputs/onnx_quantized/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+outputs/model/
+outputs/onnx/
+outputs/onnx_quantized/
